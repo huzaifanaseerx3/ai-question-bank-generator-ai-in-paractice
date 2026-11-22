@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { API_URL } from './api.js';
 
 const navigation = [
   { label: 'Dashboard', path: '/', icon: '⌂' },
@@ -29,9 +30,8 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-    fetch(`${apiUrl}/api/health`, { signal: controller.signal })
+    fetch(`${API_URL}/api/health`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('Health check failed');
         return response.json();
@@ -205,7 +205,6 @@ function UploadPage({ onQuestionsGenerated }) {
   const [generationComplete, setGenerationComplete] = useState(false);
   const [generationId, setGenerationId] = useState(null);
   const [result, setResult] = useState(null);
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   function selectFile(selectedFile) {
     if (!selectedFile) return;
@@ -240,7 +239,7 @@ function UploadPage({ onQuestionsGenerated }) {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${apiUrl}/api/upload`, { method: 'POST', body: formData });
+      const response = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'The PDF could not be processed.');
       setResult(data);
@@ -263,7 +262,7 @@ function UploadPage({ onQuestionsGenerated }) {
     setGenerationComplete(false);
 
     try {
-      const response = await fetch(`${apiUrl}/api/questions`, {
+      const response = await fetch(`${API_URL}/api/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: result.text, generationId: requestGenerationId })
@@ -490,7 +489,6 @@ function EvaluationPage({
   const [error, setError] = useState('');
   const [progressCount, setProgressCount] = useState(0);
   const [progressSummary, setProgressSummary] = useState(null);
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const results = evaluation?.results || [];
   const summary = (isEvaluating && progressSummary) ||
     evaluation?.summary || progressSummary || summarizeEvaluationResults(results);
@@ -514,7 +512,7 @@ function EvaluationPage({
       setError('');
       try {
         const response = await fetch(
-          `${apiUrl}/api/evaluation/results?generationId=${encodeURIComponent(generationId)}`,
+          `${API_URL}/api/evaluation/results?generationId=${encodeURIComponent(generationId)}`,
           { signal: controller.signal }
         );
         const data = await response.json();
@@ -535,7 +533,7 @@ function EvaluationPage({
       active = false;
       controller.abort();
     };
-  }, [apiUrl, evaluation?.completed, generationId, humanReviewFinalized, onEvaluationUpdate, results.length]);
+  }, [API_URL, evaluation?.completed, generationId, humanReviewFinalized, onEvaluationUpdate, results.length]);
 
   useEffect(() => {
     if (!isEvaluating || !generationId) return undefined;
@@ -545,7 +543,7 @@ function EvaluationPage({
     async function refreshProgress() {
       try {
         const response = await fetch(
-          `${apiUrl}/api/evaluation/status?generationId=${encodeURIComponent(generationId)}`,
+          `${API_URL}/api/evaluation/status?generationId=${encodeURIComponent(generationId)}`,
           { signal: controller.signal }
         );
         const data = await response.json();
@@ -570,7 +568,7 @@ function EvaluationPage({
       controller.abort();
       window.clearInterval(intervalId);
     };
-  }, [apiUrl, generationId, isEvaluating]);
+  }, [API_URL, generationId, isEvaluating]);
 
   async function runEvaluation() {
     if (!generationId || questions.length !== 40 || isEvaluating || isComplete) return;
@@ -579,7 +577,7 @@ function EvaluationPage({
     setError('');
 
     try {
-      const response = await fetch(`${apiUrl}/api/evaluation/run`, {
+      const response = await fetch(`${API_URL}/api/evaluation/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generationId })
@@ -735,7 +733,6 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (!generationId || questionCount !== 40) return undefined;
@@ -747,7 +744,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
       setError('');
       try {
         const response = await fetch(
-          `${apiUrl}/api/human-review/sample?generationId=${encodeURIComponent(generationId)}`,
+          `${API_URL}/api/human-review/sample?generationId=${encodeURIComponent(generationId)}`,
           { signal: controller.signal }
         );
         const data = await response.json();
@@ -766,7 +763,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
 
         if (data.finalized) {
           const comparisonResponse = await fetch(
-            `${apiUrl}/api/human-review/comparison?generationId=${encodeURIComponent(generationId)}`,
+            `${API_URL}/api/human-review/comparison?generationId=${encodeURIComponent(generationId)}`,
             { signal: controller.signal }
           );
           const comparisonData = await comparisonResponse.json();
@@ -788,7 +785,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
       active = false;
       controller.abort();
     };
-  }, [apiUrl, generationId, onFinalized, questionCount]);
+  }, [API_URL, generationId, onFinalized, questionCount]);
 
   const currentQuestion = sample?.questions[currentIndex];
   const currentDraft = currentQuestion
@@ -809,7 +806,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
     setIsSaving(true);
     setError('');
     try {
-      const response = await fetch(`${apiUrl}/api/human-review/review`, {
+      const response = await fetch(`${API_URL}/api/human-review/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -852,7 +849,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
     setIsFinalizing(true);
     setError('');
     try {
-      const response = await fetch(`${apiUrl}/api/human-review/finalize`, {
+      const response = await fetch(`${API_URL}/api/human-review/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generationId })
@@ -876,7 +873,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
     setError('');
     try {
       const response = await fetch(
-        `${apiUrl}/api/human-review/comparison?generationId=${encodeURIComponent(generationId)}`
+        `${API_URL}/api/human-review/comparison?generationId=${encodeURIComponent(generationId)}`
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not load the final comparison.');
@@ -897,7 +894,7 @@ function HumanReviewPage({ generationId, onFinalized, questionCount }) {
     setError('');
     try {
       const response = await fetch(
-        `${apiUrl}/api/human-review/export?generationId=${encodeURIComponent(generationId)}`
+        `${API_URL}/api/human-review/export?generationId=${encodeURIComponent(generationId)}`
       );
       if (!response.ok) {
         const data = await response.json();

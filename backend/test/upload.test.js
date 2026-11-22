@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { after, before, test } from 'node:test';
-import { app } from '../src/app.js';
+import { app, createApp } from '../src/app.js';
 
 function createPdf(pageTexts) {
   const objects = [
@@ -54,6 +54,38 @@ test('health endpoint remains available', async () => {
   const response = await fetch(`${baseUrl}/api/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: 'ok' });
+});
+
+test('CORS allows the configured frontend origin and localhost development origins', async () => {
+  const previousFrontendUrl = process.env.FRONTEND_URL;
+  process.env.FRONTEND_URL = 'https://question-bank.example.vercel.app';
+  const corsServer = createApp().listen(0);
+  if (previousFrontendUrl === undefined) {
+    delete process.env.FRONTEND_URL;
+  } else {
+    process.env.FRONTEND_URL = previousFrontendUrl;
+  }
+  await once(corsServer, 'listening');
+  const corsBaseUrl = `http://127.0.0.1:${corsServer.address().port}/api/health`;
+
+  try {
+    for (const origin of [
+      'https://question-bank.example.vercel.app',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    ]) {
+      const response = await fetch(corsBaseUrl, { headers: { Origin: origin } });
+      assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    }
+
+    const disallowedResponse = await fetch(corsBaseUrl, {
+      headers: { Origin: 'https://unrelated.example' }
+    });
+    assert.equal(disallowedResponse.headers.has('access-control-allow-origin'), false);
+  } finally {
+    corsServer.close();
+    await once(corsServer, 'close');
+  }
 });
 
 test('extracts text, filename, and page count from a multi-page PDF', async () => {

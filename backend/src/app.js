@@ -16,7 +16,6 @@ dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 }
@@ -52,8 +51,15 @@ export function createApp({
   humanReviewComparisonReader = generateQuestions.getHumanReviewComparison
 } = {}) {
   const app = express();
+  const allowedOrigins = new Set([
+    process.env.FRONTEND_URL?.trim(),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173'
+  ].filter(Boolean));
 
-  app.use(cors({ origin: allowedOrigin }));
+  app.use(cors({
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin))
+  }));
   app.use(express.json({ limit: '4mb' }));
 
   app.get('/api/health', (_request, response) => {
