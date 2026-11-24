@@ -16,10 +16,34 @@ dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const PRODUCTION_FRONTEND_ORIGIN = 'https://ai-question-bank-generator-ai-in-pa.vercel.app';
+const DEVELOPMENT_FRONTEND_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 }
 });
+
+function parseFrontendOrigins(frontendUrl) {
+  if (!frontendUrl?.trim()) return [];
+
+  return frontendUrl.split(',').map((configuredOrigin) => {
+    let parsedOrigin;
+    try {
+      parsedOrigin = new URL(configuredOrigin.trim());
+    } catch {
+      throw new Error('FRONTEND_URL must contain comma-separated HTTP or HTTPS origins.');
+    }
+
+    if (!['http:', 'https:'].includes(parsedOrigin.protocol)) {
+      throw new Error('FRONTEND_URL must contain comma-separated HTTP or HTTPS origins.');
+    }
+
+    return parsedOrigin.origin;
+  });
+}
 
 export async function extractPdf(buffer) {
   const parser = new PDFParse({ data: buffer });
@@ -48,17 +72,21 @@ export function createApp({
   humanReviewSampleReader = generateQuestions.getHumanReviewSample,
   humanReviewSaver = generateQuestions.saveHumanReview,
   humanReviewFinalizer = generateQuestions.finalizeHumanReview,
-  humanReviewComparisonReader = generateQuestions.getHumanReviewComparison
+  humanReviewComparisonReader = generateQuestions.getHumanReviewComparison,
+  frontendUrl = process.env.FRONTEND_URL
 } = {}) {
   const app = express();
   const allowedOrigins = new Set([
-    process.env.FRONTEND_URL?.trim(),
-    'http://localhost:5173',
-    'http://127.0.0.1:5173'
-  ].filter(Boolean));
+    PRODUCTION_FRONTEND_ORIGIN,
+    ...DEVELOPMENT_FRONTEND_ORIGINS,
+    ...parseFrontendOrigins(frontendUrl)
+  ]);
 
   app.use(cors({
-    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin))
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    optionsSuccessStatus: 204
   }));
   app.use(express.json({ limit: '4mb' }));
 

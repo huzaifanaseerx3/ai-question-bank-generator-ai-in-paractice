@@ -58,27 +58,58 @@ test('health endpoint remains available', async () => {
 
 test('CORS allows the configured frontend origin and localhost development origins', async () => {
   const previousFrontendUrl = process.env.FRONTEND_URL;
-  process.env.FRONTEND_URL = 'https://question-bank.example.vercel.app';
-  const corsServer = createApp().listen(0);
-  if (previousFrontendUrl === undefined) {
-    delete process.env.FRONTEND_URL;
-  } else {
-    process.env.FRONTEND_URL = previousFrontendUrl;
+  process.env.FRONTEND_URL = ' https://ai-question-bank-generator-ai-in-pa.vercel.app/ , https://second.example.vercel.app ';
+  let corsServer;
+  try {
+    corsServer = createApp().listen(0);
+  } finally {
+    if (previousFrontendUrl === undefined) {
+      delete process.env.FRONTEND_URL;
+    } else {
+      process.env.FRONTEND_URL = previousFrontendUrl;
+    }
   }
   await once(corsServer, 'listening');
-  const corsBaseUrl = `http://127.0.0.1:${corsServer.address().port}/api/health`;
+  const corsBaseUrl = `http://127.0.0.1:${corsServer.address().port}`;
 
   try {
     for (const origin of [
-      'https://question-bank.example.vercel.app',
+      'https://ai-question-bank-generator-ai-in-pa.vercel.app',
+      'https://second.example.vercel.app',
       'http://localhost:5173',
       'http://127.0.0.1:5173'
     ]) {
-      const response = await fetch(corsBaseUrl, { headers: { Origin: origin } });
+      const response = await fetch(`${corsBaseUrl}/api/health`, { headers: { Origin: origin } });
       assert.equal(response.headers.get('access-control-allow-origin'), origin);
     }
 
-    const disallowedResponse = await fetch(corsBaseUrl, {
+    const uploadPreflight = await fetch(`${corsBaseUrl}/api/upload`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://ai-question-bank-generator-ai-in-pa.vercel.app',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type'
+      }
+    });
+    assert.equal(uploadPreflight.status, 204);
+    assert.equal(
+      uploadPreflight.headers.get('access-control-allow-origin'),
+      'https://ai-question-bank-generator-ai-in-pa.vercel.app'
+    );
+    assert.match(uploadPreflight.headers.get('access-control-allow-methods'), /POST/);
+    assert.match(uploadPreflight.headers.get('access-control-allow-headers'), /content-type/i);
+
+    const uploadResponse = await fetch(`${corsBaseUrl}/api/upload`, {
+      method: 'POST',
+      headers: { Origin: 'https://ai-question-bank-generator-ai-in-pa.vercel.app' }
+    });
+    assert.equal(uploadResponse.status, 400);
+    assert.equal(
+      uploadResponse.headers.get('access-control-allow-origin'),
+      'https://ai-question-bank-generator-ai-in-pa.vercel.app'
+    );
+
+    const disallowedResponse = await fetch(`${corsBaseUrl}/api/health`, {
       headers: { Origin: 'https://unrelated.example' }
     });
     assert.equal(disallowedResponse.headers.has('access-control-allow-origin'), false);
